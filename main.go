@@ -2,16 +2,10 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"io"
 	"os"
 )
-
-type Parameters struct {
-	InFile *string
-	Action *string
-}
 
 func main() {
 
@@ -24,31 +18,35 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	entries := ReadFile(contents)
-	for _, v := range entries {
-		fmt.Println(v)
+	logEntries := ParseFile(contents)
+	for _, entry := range logEntries {
+		//if !entry.OK {
+		fmt.Printf("%+v\n", entry.Message)
+		//}
 	}
 
 }
 
-func parseFlags() Parameters {
-	parameters := Parameters{
-		InFile: flag.String("i", "print-provider.log", "input log file"),
-		Action: flag.String("a", "list-job", "list all print jobs"),
-	}
-	flag.Parse()
-
-	return parameters
-}
-
-func ReadFile(r io.Reader) (LogEntries []*Entry) {
+func ParseFile(r io.Reader) (entries []Entry) {
 	scanner := bufio.NewScanner(r)
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
-		t := scanner.Text()
-		entry := NewEntry()
-		entry.Parse(t)
-		LogEntries = append(LogEntries, entry)
+		s := scanner.Text()
+		line := Line(s)
+		var entry Entry
+		entry.Level, entry.OK = line.Level()
+		entry.Time, entry.OK = line.Time()
+
+		if entry.Level == "DEV" || entry.Level == "DEBUG" {
+			entry.SourceFile, entry.OK = line.SourceFile()
+			entry.LineNumber, entry.OK = line.LineNumber()
+			entry.Message, entry.OK = line.MessageWhenDebug()
+			entry.TID, entry.OK = line.TID()
+		} else {
+			entry.Message, entry.OK = line.Message()
+		}
+
+		entries = append(entries, entry)
 	}
 	return
 }
